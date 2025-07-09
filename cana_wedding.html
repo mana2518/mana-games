@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カナの婚礼 - 水を葡萄酒に</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #FFE4E1, #FFF8DC, #F5DEB3);
+            font-family: 'Georgia', serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .game-container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            border: 3px solid #8B4513;
+        }
+        
+        canvas {
+            border: 4px solid #8B4513;
+            background: linear-gradient(to bottom, #FFE4E1 0%, #FFF8DC 50%, #F5DEB3 100%);
+            border-radius: 10px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            color: #8B4513;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .miracle-meter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .miracle-bar {
+            width: 150px;
+            height: 20px;
+            background: #DDD;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #8B4513;
+        }
+        
+        .miracle-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FFD700, #FF6347);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .hearts {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .heart {
+            width: 25px;
+            height: 25px;
+            background: #FF1493;
+            border-radius: 50%;
+            border: 2px solid #8B0000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+        }
+        
+        .heart::before {
+            content: '♥';
+        }
+        
+        .controls {
+            margin-top: 15px;
+            color: #8B4513;
+            font-style: italic;
+        }
+        
+        .title {
+            margin-bottom: 20px;
+            color: #8B4513;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            font-family: 'Georgia', serif;
+        }
+        
+        .subtitle {
+            margin-bottom: 15px;
+            color: #A0522D;
+            font-size: 16px;
+            font-style: italic;
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 24px;
+            display: none;
+            border: 3px solid #FFD700;
+        }
+        
+        .restart-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-family: 'Georgia', serif;
+        }
+        
+        .restart-btn:hover {
+            background: #45a049;
+        }
+        
+        .blessing {
+            position: fixed;
+            pointer-events: none;
+            font-size: 24px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            animation: blessAnim 2s ease-out forwards;
+        }
+        
+        @keyframes blessAnim {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="title">カナの婚礼</div>
+        <div class="subtitle">～ 水を葡萄酒に変える奇跡 ～</div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div class="ui">
+            <div class="miracle-meter">
+                <span>奇跡の力:</span>
+                <div class="miracle-bar">
+                    <div class="miracle-fill" id="miracleFill"></div>
+                </div>
+            </div>
+            <div class="score">祝福: <span id="score">0</span></div>
+            <div class="hearts" id="hearts">
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            矢印キー または A/D キーで移動 | スマホは画面タッチで移動 | スペースキーで一時停止
+        </div>
+        
+        <div class="game-over" id="gameOver">
+            <div id="gameOverTitle">婚礼は終了しました</div>
+            <div>最終祝福: <span id="finalScore">0</span></div>
+            <button class="restart-btn" onclick="restartGame()">もう一度奇跡を</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const heartsElement = document.getElementById('hearts');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+        const miracleFillElement = document.getElementById('miracleFill');
+        const gameOverTitleElement = document.getElementById('gameOverTitle');
+
+        // ゲーム状態
+        let gameState = 'playing';
+        let score = 0;
+        let hearts = 5;
+        let gameSpeed = 1;
+        let miraclePower = 0;
+        let maxMiraclePower = 100;
+
+        // プレイヤー（イエス）
+        const player = {
+            x: canvas.width / 2 - 50,
+            y: canvas.height - 120,
+            width: 100,
+            height: 100,
+            speed: 7
+        };
+
+        // 落下アイテム配列
+        let fallingItems = [];
+        let guests = [];
+        let particles = [];
+
+        // タッチ操作用の変数
+        let touchStartX = 0;
+        let touchCurrentX = 0;
+        let isTouching = false;
+
+        // キー入力
+        const keys = {};
+        
+        // イベントリスナー
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (gameState === 'playing') {
+                    gameState = 'paused';
+                } else if (gameState === 'paused') {
+                    gameState = 'playing';
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // タッチイベント
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchCurrentX = touchStartX;
+            isTouching = true;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isTouching) {
+                touchCurrentX = e.touches[0].clientX;
+            }
+        });
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isTouching = false;
+        });
+
+        // 水がめクラス
+        class WaterJar {
+            constructor() {
+                this.x = Math.random() * (canvas.width - 50);
+                this.y = -60;
+                this.width = 50;
+                this.height = 60;
+                this.speed = 2 + Math.random() * 2;
+                this.hasWater = true;
+            }
+
+            update() {
+                this.y += this.speed * gameSpeed;
+            }
+
+            draw() {
+                // 水がめの影
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(this.x + 3, this.y + 3, this.width, this.height);
+                
+                // 水がめ本体
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // 水がめの装飾
+                ctx.fillStyle = '#A0522D';
+                ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, this.height - 10);
+                
+                // 取っ手
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(this.x - 5, this.y + 20, 8, 0, Math.PI);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(this.x + this.width + 5, this.y + 20, 8, 0, Math.PI);
+                ctx.stroke();
+                
+                // 水の内容物
+                if (this.hasWater) {
+                    ctx.fillStyle = '#4169E1';
+                    ctx.fillRect(this.x + 8, this.y + 8, this.width - 16, this.height - 20);
+                    
+                    // 水の波紋
+                    ctx.fillStyle = '#6495ED';
+                    ctx.fillRect(this.x + 8, this.y + 8, this.width - 16, 5);
+                }
+            }
+
+            isOffScreen() {
+                return this.y > canvas.height;
+            }
+        }
+
+        // 来賓クラス
+        class Guest {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 40;
+                this.height = 60;
+                this.happiness = 50;
+                this.maxHappiness = 100;
+                this.animFrame = 0;
+            }
+
+            update() {
+                this.animFrame += 0.1;
+                this.happiness = Math.max(0, this.happiness - 0.1);
+            }
+
+            draw() {
+                // 来賓の体
+                ctx.fillStyle = this.happiness > 50 ? '#4169E1' : '#8B4513';
+                ctx.fillRect(this.x, this.y + 20, this.width, 40);
+                
+                // 来賓の頭
+                ctx.fillStyle = '#FFDBAC';
+                ctx.fillRect(this.x + 10, this.y, 20, 20);
+                
+                // 髪
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(this.x + 8, this.y - 5, 24, 10);
+                
+                // 目
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(this.x + 13, this.y + 5, 2, 2);
+                ctx.fillRect(this.x + 25, this.y + 5, 2, 2);
+                
+                // 口（幸福度に応じて変化）
+                ctx.fillStyle = this.happiness > 50 ? '#FF1493' : '#8B4513';
+                if (this.happiness > 70) {
+                    ctx.fillRect(this.x + 15, this.y + 12, 10, 3);
+                } else if (this.happiness > 30) {
+                    ctx.fillRect(this.x + 18, this.y + 12, 4, 2);
+                } else {
+                    ctx.fillRect(this.x + 15, this.y + 14, 10, 2);
+                }
+                
+                // 幸福度バー
+                ctx.fillStyle = '#DDD';
+                ctx.fillRect(this.x, this.y - 15, this.width, 5);
+                
+                const happinessColor = this.happiness > 70 ? '#FFD700' : 
+                                     this.happiness > 30 ? '#FF6347' : '#8B0000';
+                ctx.fillStyle = happinessColor;
+                ctx.fillRect(this.x, this.y - 15, (this.width * this.happiness) / this.maxHappiness, 5);
+            }
+
+            receiveWine() {
+                this.happiness = Math.min(this.maxHappiness, this.happiness + 30);
+            }
+        }
+
+        // パーティクルクラス
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+                this.color = color;
+                this.life = 1;
+                this.decay = 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, 4, 4);
+                ctx.globalAlpha = 1;
+            }
+
+            isDead() {
+                return this.life <= 0;
+            }
+        }
+
+        // イエスを描画
+        function drawPlayer() {
+            // イエスの影
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(player.x + 5, player.y + 5, player.width, player.height);
+            
+            // イエスのローブ
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(player.x + 20, player.y + 30, 60, 70);
+            
+            // ローブの装飾
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(player.x + 22, player.y + 32, 56, 3);
+            ctx.fillRect(player.x + 22, player.y + 50, 56, 2);
+            ctx.fillRect(player.x + 22, player.y + 70, 56, 2);
+            
+            // イエスの頭
+            ctx.fillStyle = '#FFDBAC';
+            ctx.fillRect(player.x + 35, player.y, 30, 35);
+            
+            // 髪
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(player.x + 30, player.y - 5, 40, 15);
+            ctx.fillRect(player.x + 32, player.y + 25, 36, 20);
+            
+            // 目
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(player.x + 40, player.y + 10, 3, 3);
+            ctx.fillRect(player.x + 57, player.y + 10, 3, 3);
+            
+            // 鼻
+            ctx.fillStyle = '#E6C2A6';
+            ctx.fillRect(player.x + 48, player.y + 15, 4, 6);
+            
+            // 口
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(player.x + 45, player.y + 22, 10, 2);
+            
+            // 手
+            ctx.fillStyle = '#FFDBAC';
+            ctx.fillRect(player.x + 10, player.y + 40, 15, 15);
+            ctx.fillRect(player.x + 75, player.y + 40, 15, 15);
+            
+            // 奇跡のオーラ（奇跡の力に応じて）
+            if (miraclePower > 50) {
+                ctx.fillStyle = `rgba(255, 215, 0, ${miraclePower / 200})`;
+                ctx.fillRect(player.x - 10, player.y - 10, player.width + 20, player.height + 20);
+            }
+        }
+
+        // 背景を描画
+        function drawBackground() {
+            // 背景グラデーション
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#FFE4E1');
+            gradient.addColorStop(0.5, '#FFF8DC');
+            gradient.addColorStop(1, '#F5DEB3');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 婚礼会場の装飾
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+            
+            // 柱
+            ctx.fillStyle = '#A0522D';
+            for (let i = 0; i < 4; i++) {
+                const x = 100 + i * 200;
+                ctx.fillRect(x, canvas.height - 200, 20, 150);
+                
+                // 柱の装飾
+                ctx.fillStyle = '#FFD700';
+                ctx.fillRect(x, canvas.height - 200, 20, 10);
+                ctx.fillRect(x, canvas.height - 80, 20, 10);
+            }
+            
+            // 天井の装飾
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 50);
+            ctx.lineTo(canvas.width, 50);
+            ctx.stroke();
+            
+            // 花の装飾
+            ctx.fillStyle = '#FF69B4';
+            for (let i = 0; i < 10; i++) {
+                const x = i * 80 + 40;
+                ctx.fillRect(x, 40, 8, 8);
+            }
+        }
+
+        // 衝突判定
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // 水がめ生成
+        function spawnWaterJar() {
+            fallingItems.push(new WaterJar());
+        }
+
+        // 来賓初期化
+        function initGuests() {
+            guests = [];
+            for (let i = 0; i < 8; i++) {
+                const x = 50 + i * 90;
+                const y = canvas.height - 110;
+                guests.push(new Guest(x, y));
+            }
+        }
+
+        // プレイヤー更新
+        function updatePlayer() {
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                player.x = Math.max(0, player.x - player.speed);
+            }
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+            }
+            
+            if (isTouching) {
+                const canvasRect = canvas.getBoundingClientRect();
+                const touchX = touchCurrentX - canvasRect.left;
+                const targetX = touchX - player.width / 2;
+                
+                if (Math.abs(targetX - player.x) > 5) {
+                    if (targetX > player.x) {
+                        player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+                    } else {
+                        player.x = Math.max(0, player.x - player.speed);
+                    }
+                }
+            }
+        }
+
+        // 祝福エフェクト
+        function showBlessing(text, x, y) {
+            const blessing = document.createElement('div');
+            blessing.className = 'blessing';
+            blessing.textContent = text;
+            blessing.style.left = x + 'px';
+            blessing.style.top = y + 'px';
+            document.body.appendChild(blessing);
+            
+            setTimeout(() => {
+                document.body.removeChild(blessing);
+            }, 2000);
+        }
+
+        // ハート表示更新
+        function updateHeartsDisplay() {
+            const heartElements = heartsElement.children;
+            for (let i = 0; i < heartElements.length; i++) {
+                heartElements[i].style.opacity = i < hearts ? '1' : '0.3';
+            }
+        }
+
+        // 奇跡メーター更新
+        function updateMiracleMeter() {
+            const percentage = (miraclePower / maxMiraclePower) * 100;
+            miracleFillElement.style.width = percentage + '%';
+        }
+
+        // ゲームオーバー
+        function gameOver() {
+            gameState = 'gameOver';
+            finalScoreElement.textContent = score;
+            
+            if (score > 500) {
+                gameOverTitleElement.textContent = '素晴らしい婚礼でした！';
+            } else if (score > 200) {
+                gameOverTitleElement.textContent = '良い婚礼でした';
+            } else {
+                gameOverTitleElement.textContent = '婚礼は終了しました';
+            }
+            
+            gameOverElement.style.display = 'block';
+        }
+
+        // ゲーム再開
+        function restartGame() {
+            gameState = 'playing';
+            score = 0;
+            hearts = 5;
+            gameSpeed = 1;
+            miraclePower = 0;
+            fallingItems = [];
+            particles = [];
+            player.x = canvas.width / 2 - 50;
+            gameOverElement.style.display = 'none';
+            initGuests();
+            updateHeartsDisplay();
+            updateMiracleMeter();
+        }
+
+        // ゲームループ
+        function gameLoop() {
+            if (gameState !== 'playing') {
+                if (gameState === 'paused') {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '48px Georgia';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('一時停止', canvas.width / 2, canvas.height / 2);
+                    ctx.textAlign = 'left';
+                }
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+
+            // 背景描画
+            drawBackground();
+
+            // プレイヤー更新と描画
+            updatePlayer();
+            drawPlayer();
+
+            // 来賓更新と描画
+            for (let guest of guests) {
+                guest.update();
+                guest.draw();
+            }
+
+            // 水がめ生成
+            if (Math.random() < 0.02) {
+                spawnWaterJar();
+            }
+
+            // 水がめ更新
+            for (let i = fallingItems.length - 1; i >= 0; i--) {
+                const jar = fallingItems[i];
+                jar.update();
+                jar.draw();
+
+                // 衝突判定
+                if (checkCollision(player, jar)) {
+                    if (jar.hasWater) {
+                        // 水を葡萄酒に変える奇跡
+                        miraclePower = Math.min(maxMiraclePower, miraclePower + 20);
+                        score += 25;
+                        
+                        // パーティクルエフェクト
+                        for (let p = 0; p < 10; p++) {
+                            particles.push(new Particle(jar.x + 25, jar.y + 30, '#800080'));
+                        }
+                        
+                        // 来賓に葡萄酒を配る
+                        for (let guest of guests) {
+                            if (Math.random() < 0.7) {
+                                guest.receiveWine();
+                            }
+                        }
+                        
+                        showBlessing('奇跡！', jar.x, jar.y);
+                    }
+                    fallingItems.splice(i, 1);
+                    continue;
+                }
+
+                // 画面外に出た水がめ
+                if (jar.isOffScreen()) {
+                    hearts--;
+                    if (hearts <= 0) {
+                        gameOver();
+                        return;
+                    }
+                    fallingItems.splice(i, 1);
+                }
+            }
+
+            // パーティクル更新
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.update();
+                particle.draw();
+                
+                if (particle.isDead()) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // 奇跡の力を徐々に減少
+            miraclePower = Math.max(0, miraclePower - 0.2);
+
+            // ゲーム速度増加
+            gameSpeed = 1 + score / 500;
+
+            // UI更新
+            scoreElement.textContent = score;
+            updateHeartsDisplay();
+            updateMiracleMeter();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ゲーム開始
+        initGuests();
+        updateHeartsDisplay();
+        updateMiracleMeter();
+        gameLoop();
+    </script>
+</body>
+</html>
